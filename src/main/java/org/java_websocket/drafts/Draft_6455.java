@@ -27,6 +27,7 @@ package org.java_websocket.drafts;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -509,20 +510,46 @@ public class Draft_6455 extends Draft {
       throw new IllegalStateException("Size representation not supported/specified");
     }
     if (mask) {
-      ByteBuffer maskkey = ByteBuffer.allocate(4);
-      maskkey.putInt(reuseableRandom.nextInt());
-      buf.put(maskkey.array());
-      for (int i = 0; mes.hasRemaining(); i++) {
-        buf.put((byte) (mes.get() ^ maskkey.get(i % 4)));
-      }
+      int maskInt = reuseableRandom.nextInt();
+      buf.putInt(maskInt);
+      maskBytes(maskInt, mes, buf);
     } else {
       buf.put(mes);
-      //Reset the position of the bytebuffer e.g. for additional use
-      mes.flip();
     }
+    //Reset the position of the bytebuffer e.g. for additional use
+    mes.flip();
     assert (buf.remaining() == 0) : buf.remaining();
     buf.flip();
     return buf;
+  }
+
+  static void maskBytes(int maskInt, ByteBuffer source, ByteBuffer buf){
+    ByteOrder srcOrder = source.order();
+    ByteOrder dstOrder = buf.order();
+    int i = source.position();
+    int end = source.limit();
+    if (srcOrder == dstOrder){
+      long longMask = maskInt & 0xFFFFFFFFL;
+      longMask = longMask << 32 | longMask;
+      if (srcOrder == ByteOrder.LITTLE_ENDIAN) {
+        longMask = Long.reverseBytes(longMask);
+      }
+      int limit = end - 7;
+      for (; i < limit; i += 8) {
+        buf.putLong(source.getLong(i) ^ longMask);
+      }
+      if (i < end - 3) {
+        buf.putInt(source.getInt(i) ^ (int) longMask);
+        i += 4;
+      }
+    }
+    int keyOffset = 0;
+    ByteBuffer mask = ByteBuffer.allocate(4);
+    mask.putInt(maskInt);
+    for (; i < end; i++) {
+      byte byteData = source.get(i);
+      buf.put((byte)(byteData ^ mask.get(keyOffset++ & 3)));
+    }
   }
 
   private Framedata translateSingleFrame(ByteBuffer buffer)
