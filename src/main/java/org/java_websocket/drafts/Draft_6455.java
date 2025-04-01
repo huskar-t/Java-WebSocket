@@ -523,12 +523,12 @@ public class Draft_6455 extends Draft {
     return buf;
   }
 
-  static void maskBytes(int maskInt, ByteBuffer source, ByteBuffer buf){
+  static void maskBytes(int maskInt, ByteBuffer source, ByteBuffer buf) {
     ByteOrder srcOrder = source.order();
     ByteOrder dstOrder = buf.order();
     int i = source.position();
     int end = source.limit();
-    if (srcOrder == dstOrder){
+    if (srcOrder == dstOrder) {
       long longMask = maskInt & 0xFFFFFFFFL;
       longMask = longMask << 32 | longMask;
       if (srcOrder == ByteOrder.LITTLE_ENDIAN) {
